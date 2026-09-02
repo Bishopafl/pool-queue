@@ -56,7 +56,10 @@
 
                 <div class="field">
                     <span class="label">Lineup</span>
-                    <div class="lineup">
+                    <p class="hint" style="margin-top:0">
+                        Tap the left of a row for Side A, the right for Side B. Tap the lit side again to drop them out.
+                    </p>
+                    <div class="lineup lineup--toggles">
                         @foreach ($players as $player)
                             @php
                                 $default = in_array($player->id, $preassigned['a'], true) ? 'a'
@@ -64,26 +67,30 @@
                                 $current = old('assign.' . $player->id, $default);
                             @endphp
 
-                            <div class="lineup__row">
-                                <span class="lineup__name">
+                            <div class="side-toggle" role="group" aria-label="Side for {{ $player->name }}">
+                                <input class="side-toggle__radio" type="radio" id="p{{ $player->id }}-a"
+                                       name="assign[{{ $player->id }}]" value="a" @checked($current === 'a')>
+                                <input class="side-toggle__radio" type="radio" id="p{{ $player->id }}-b"
+                                       name="assign[{{ $player->id }}]" value="b" @checked($current === 'b')>
+                                <input class="side-toggle__radio" type="radio" id="p{{ $player->id }}-out"
+                                       name="assign[{{ $player->id }}]" value="out" @checked($current === 'out')>
+
+                                <label class="side-toggle__half side-toggle__half--a" for="p{{ $player->id }}-a"
+                                       data-side="a" style="--side-color: {{ $player->side_a_color }}"
+                                       aria-label="{{ $player->name }} on Side A">
+                                    <span class="side-toggle__tag">A</span>
+                                </label>
+                                <label class="side-toggle__half side-toggle__half--b" for="p{{ $player->id }}-b"
+                                       data-side="b" style="--side-color: {{ $player->side_b_color }}"
+                                       aria-label="{{ $player->name }} on Side B">
+                                    <span class="side-toggle__tag">B</span>
+                                </label>
+
+                                <span class="side-toggle__name">
                                     {{ $player->name }}
                                     @if ($player->nickname)
                                         <span class="rack__sub">“{{ $player->nickname }}”</span>
                                     @endif
-                                </span>
-
-                                <span class="lineup__choices" role="group" aria-label="Side for {{ $player->name }}">
-                                    <input type="radio" id="p{{ $player->id }}-out" name="assign[{{ $player->id }}]"
-                                           value="out" @checked($current === 'out')>
-                                    <label class="is-out" for="p{{ $player->id }}-out">Out</label>
-
-                                    <input type="radio" id="p{{ $player->id }}-a" name="assign[{{ $player->id }}]"
-                                           value="a" @checked($current === 'a')>
-                                    <label for="p{{ $player->id }}-a">Side A</label>
-
-                                    <input type="radio" id="p{{ $player->id }}-b" name="assign[{{ $player->id }}]"
-                                           value="b" @checked($current === 'b')>
-                                    <label for="p{{ $player->id }}-b">Side B</label>
                                 </span>
                             </div>
                         @endforeach
@@ -130,6 +137,21 @@
                             if (ballsInput && standardTargets.indexOf(ballsInput.value) !== -1) {
                                 ballsInput.value = radio.getAttribute('data-target');
                             }
+                        });
+                    });
+
+                    // Tapping the side a player is already on drops them to "out".
+                    form.querySelectorAll('.side-toggle').forEach(function (row) {
+                        row.querySelectorAll('.side-toggle__half').forEach(function (half) {
+                            half.addEventListener('click', function (event) {
+                                var wanted = half.getAttribute('data-side');
+                                var checked = row.querySelector('.side-toggle__radio:checked');
+                                if (checked && checked.value === wanted) {
+                                    event.preventDefault();
+                                    row.querySelector('.side-toggle__radio[value="out"]').checked = true;
+                                    form.dispatchEvent(new Event('change'));
+                                }
+                            });
                         });
                     });
 

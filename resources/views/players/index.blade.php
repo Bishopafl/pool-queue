@@ -9,6 +9,7 @@
             <h2 class="card__title">Add a player</h2>
         </div>
 
+        @php $nextColors = \App\Models\Player::defaultColorsFor($players->count()); @endphp
         <form method="POST" action="{{ route('players.store') }}">
             @csrf
             <div class="field-row">
@@ -23,6 +24,17 @@
                            value="{{ old('nickname') }}" placeholder="What the board shows">
                 </div>
                 <button type="submit" class="btn btn--primary">Add player</button>
+            </div>
+
+            <div class="swatch-row">
+                @include('partials.swatch-picker', [
+                    'name' => 'side_a_color', 'label' => 'Side A colour', 'id' => 'new-a',
+                    'selected' => old('side_a_color', $nextColors['side_a_color']),
+                ])
+                @include('partials.swatch-picker', [
+                    'name' => 'side_b_color', 'label' => 'Side B colour', 'id' => 'new-b',
+                    'selected' => old('side_b_color', $nextColors['side_b_color']),
+                ])
             </div>
         </form>
     </section>
@@ -55,6 +67,17 @@
                     </span>
 
                     <span class="tag">{{ $player->participations_count }} {{ \Illuminate\Support\Str::plural('game', $player->participations_count) }}</span>
+
+                    <span class="swatch-row">
+                        @include('partials.swatch-picker', [
+                            'name' => 'side_a_color', 'label' => 'Side A colour', 'id' => 'p' . $player->id . '-a',
+                            'selected' => $player->side_a_color,
+                        ])
+                        @include('partials.swatch-picker', [
+                            'name' => 'side_b_color', 'label' => 'Side B colour', 'id' => 'p' . $player->id . '-b',
+                            'selected' => $player->side_b_color,
+                        ])
+                    </span>
 
                     <button type="submit" class="btn">Save</button>
                 </form>

@@ -528,6 +528,135 @@ a:hover { text-decoration: underline; }
 
 .lineup__choices input:focus-visible + label { outline: 2px solid var(--nine); outline-offset: 2px; }
 
+/* Lineup side toggle: full-width row split by a diagonal into A | B wedges */
+.lineup--toggles { gap: 0.45rem; }
+
+.side-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.3rem;
+  border: 1px solid var(--felt-line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0a1f1a;              /* shows through as the diagonal seam */
+  isolation: isolate;
+}
+
+.side-toggle__radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.side-toggle__half {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  background: var(--felt-raised);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  transition: background 0.12s ease;
+  cursor: pointer;
+}
+
+.side-toggle__half--a {
+  clip-path: polygon(0 0, 57% 0, 43% 100%, 0 100%);
+  justify-content: flex-start;
+  padding-left: 0.85rem;
+}
+
+.side-toggle__half--b {
+  clip-path: polygon(60% 0, 100% 0, 100% 100%, 46% 100%);
+  justify-content: flex-end;
+  padding-right: 0.85rem;
+}
+
+.side-toggle__half:hover {
+  background: color-mix(in srgb, var(--side-color) 22%, var(--felt-raised));
+}
+
+.side-toggle__radio[value="a"]:checked ~ .side-toggle__half--a,
+.side-toggle__radio[value="b"]:checked ~ .side-toggle__half--b {
+  background: var(--side-color);
+}
+
+.side-toggle__radio[value="a"]:focus-visible ~ .side-toggle__half--a,
+.side-toggle__radio[value="b"]:focus-visible ~ .side-toggle__half--b {
+  outline: 2px solid var(--nine);
+  outline-offset: -3px;
+}
+
+.side-toggle__tag {
+  font-family: var(--font-data);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.12rem 0.42rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--cue-dim);
+}
+
+.side-toggle__radio[value="a"]:checked ~ .side-toggle__half--a .side-toggle__tag,
+.side-toggle__radio[value="b"]:checked ~ .side-toggle__half--b .side-toggle__tag {
+  color: #fff;
+}
+
+.side-toggle__name {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  padding: 0 2.9rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(0.95rem, 3.6vw, 1.2rem);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.12;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.side-toggle__name .rack__sub { display: block; text-shadow: none; }
+
+/* Colour swatch picker (players page) */
+.swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  width: 100%;
+  margin-top: 0.6rem;
+}
+
+.swatch-field { display: grid; gap: 0.3rem; }
+.swatch-field > .label { font-size: 0.68rem; }
+
+.swatch-picker { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.swatch-picker input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+.swatch-picker label {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--swatch);
+  cursor: pointer;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s ease;
+}
+
+.swatch-picker label:hover { transform: scale(1.12); }
+
+.swatch-picker input:checked + label {
+  border-color: var(--cue);
+  box-shadow: 0 0 0 2px var(--felt-raised), 0 0 0 3px var(--cue);
+}
+
+.swatch-picker input:focus-visible + label { outline: 2px solid var(--nine); outline-offset: 2px; }
+
 /* --- Tables -------------------------------------------------------------- */
 
 .data-table {
@@ -732,6 +861,9 @@ a:hover { text-decoration: underline; }
   .side { padding: 1.1rem 0.9rem; }
   .masthead__nav { margin-left: 0; width: 100%; }
   .rack__name { font-size: 0.98rem; }
+  .side-toggle { min-width: 0; }
+  .side-toggle__name { padding: 0 2.1rem; font-size: 0.95rem; }
+  .side-toggle__tag { font-size: 0.6rem; padding: 0.1rem 0.3rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

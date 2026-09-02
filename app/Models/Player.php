@@ -9,13 +9,51 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Player extends Model
 {
-    protected $fillable = ['name', 'nickname', 'is_active'];
+    /**
+     * Lineup wedge colours, drawn from the room palette in public/css/app.css.
+     * Cool tones lead (typical Side A), warm tones follow (typical Side B).
+     */
+    public const COLOR_SWATCHES = [
+        '#5e9bc7', // chalk blue
+        '#3a6f96', // deep blue
+        '#2d63a8', // two ball
+        '#2e8b57', // six ball green
+        '#6b4a8f', // four ball purple
+        '#f0c14b', // nine ball gold
+        '#d97b2e', // five ball orange
+        '#c1483f', // three ball red
+        '#7b3a34', // seven ball maroon
+        '#7a5335', // rail timber
+    ];
+
+    protected $fillable = ['name', 'nickname', 'is_active', 'side_a_color', 'side_b_color'];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Distinct default swatches for a newly added player, spread around the
+     * palette so the roster doesn't come out all one colour.
+     *
+     * @return array{side_a_color: string, side_b_color: string}
+     */
+    public static function defaultColorsFor(int $existingCount): array
+    {
+        $count = count(self::COLOR_SWATCHES);
+
+        return [
+            'side_a_color' => self::COLOR_SWATCHES[$existingCount % $count],
+            'side_b_color' => self::COLOR_SWATCHES[($existingCount + intdiv($count, 2)) % $count],
+        ];
+    }
+
+    public function colorForSide(string $side): string
+    {
+        return $side === 'b' ? $this->side_b_color : $this->side_a_color;
     }
 
     public function participations(): HasMany

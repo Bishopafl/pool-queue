@@ -26,6 +26,8 @@ CREATE TABLE `players` (
   `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `name` varchar(80) NOT NULL,
   `nickname` varchar(40) DEFAULT NULL,
+  `side_a_color` char(7) NOT NULL DEFAULT '#3a6f96',
+  `side_b_color` char(7) NOT NULL DEFAULT '#c1483f',
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -114,6 +116,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
   ('2026_08_29_000003_create_game_players_table', 1),
   ('2026_08_29_000004_create_queue_entries_table', 1),
   ('2026_08_29_000005_create_queue_entry_players_table', 1),
-  ('2026_09_02_000001_add_game_type_and_streak_to_games_table', 1);
+  ('2026_09_02_000001_add_game_type_and_streak_to_games_table', 1),
+  ('2026_09_02_000002_add_side_colors_to_players_table', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -26,9 +26,19 @@ class PlayerController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:80', 'unique:players,name'],
             'nickname' => ['nullable', 'string', 'max:40'],
+            'side_a_color' => ['nullable', Rule::in(Player::COLOR_SWATCHES)],
+            'side_b_color' => ['nullable', Rule::in(Player::COLOR_SWATCHES)],
         ]);
 
-        Player::create($data + ['is_active' => true]);
+        $defaults = Player::defaultColorsFor(Player::count());
+
+        Player::create([
+            'name' => $data['name'],
+            'nickname' => $data['nickname'] ?? null,
+            'is_active' => true,
+            'side_a_color' => $data['side_a_color'] ?? $defaults['side_a_color'],
+            'side_b_color' => $data['side_b_color'] ?? $defaults['side_b_color'],
+        ]);
 
         return back()->with('status', $data['name'] . ' added.');
     }
@@ -39,12 +49,16 @@ class PlayerController extends Controller
             'name' => ['required', 'string', 'max:80', Rule::unique('players', 'name')->ignore($player)],
             'nickname' => ['nullable', 'string', 'max:40'],
             'is_active' => ['nullable', 'boolean'],
+            'side_a_color' => ['nullable', Rule::in(Player::COLOR_SWATCHES)],
+            'side_b_color' => ['nullable', Rule::in(Player::COLOR_SWATCHES)],
         ]);
 
         $player->update([
             'name' => $data['name'],
             'nickname' => $data['nickname'] ?? null,
             'is_active' => (bool) ($data['is_active'] ?? false),
+            'side_a_color' => $data['side_a_color'] ?? $player->side_a_color,
+            'side_b_color' => $data['side_b_color'] ?? $player->side_b_color,
         ]);
 
         return back()->with('status', 'Saved.');
