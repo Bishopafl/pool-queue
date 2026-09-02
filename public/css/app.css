@@ -860,10 +860,30 @@ a:hover { text-decoration: underline; }
   .rail-strip { height: 4px; width: 100%; }
   .side { padding: 1.1rem 0.9rem; }
   .masthead__nav { margin-left: 0; width: 100%; }
-  .rack__name { font-size: 0.98rem; }
   .side-toggle { min-width: 0; }
   .side-toggle__name { padding: 0 2.1rem; font-size: 0.95rem; }
   .side-toggle__tag { font-size: 0.6rem; padding: 0.1rem 0.3rem; }
+
+  /* The queue rows: name on its own line, actions wrap below it */
+  .rack__row { flex-wrap: wrap; row-gap: 0.55rem; }
+  .rack__name { flex: 1 1 55%; font-size: 0.98rem; }
+  .rack__actions { flex: 1 1 100%; justify-content: flex-end; }
+  .rack__actions .btn { flex: 0 1 auto; }
+
+  /* Data tables scroll sideways inside their own box */
+  .data-table__scroll {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .data-table th,
+  .data-table td { padding: 0.5rem 0.5rem; }
+  .data-table { font-size: 0.85rem; }
+
+  /* Reclaim edge space */
+  .shell { padding-left: 0.8rem; padding-right: 0.8rem; }
+  .card { padding: 1rem 0.9rem; }
+  .table-card__top,
+  .table-card__foot { padding-left: 0.9rem; padding-right: 0.9rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
