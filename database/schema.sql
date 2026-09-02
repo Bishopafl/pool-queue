@@ -49,6 +49,7 @@ CREATE TABLE `games` (
   `status` enum('in_progress','completed','abandoned') NOT NULL DEFAULT 'in_progress',
   `table_label` varchar(40) DEFAULT NULL,
   `break_side` enum('a','b') DEFAULT NULL,
+  `shooting_side` enum('a','b') DEFAULT NULL,
   `side_a_ball_group` enum('stripes','solids') DEFAULT NULL,
   `side_b_ball_group` enum('stripes','solids') DEFAULT NULL,
   `side_a_score` smallint UNSIGNED NOT NULL DEFAULT '0',
@@ -117,6 +118,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
   ('2026_08_29_000004_create_queue_entries_table', 1),
   ('2026_08_29_000005_create_queue_entry_players_table', 1),
   ('2026_09_02_000001_add_game_type_and_streak_to_games_table', 1),
-  ('2026_09_02_000002_add_side_colors_to_players_table', 1);
+  ('2026_09_02_000002_add_side_colors_to_players_table', 1),
+  ('2026_09_02_000003_add_shooting_side_to_games_table', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

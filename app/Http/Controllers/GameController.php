@@ -89,14 +89,17 @@ class GameController extends Controller
 
         $carry = $this->resolveCarry($data['carry_from'] ?? null, $sideA, $sideB);
 
-        $game = DB::transaction(function () use ($data, $sideA, $sideB, $carry) {
+        $breakSide = $this->normalizeSide($data['break_side'] ?? null);
+
+        $game = DB::transaction(function () use ($data, $sideA, $sideB, $carry, $breakSide) {
             $game = Game::create([
                 'format' => $data['format'],
                 'game_type' => $data['game_type'],
                 'target_score' => $data['balls_to_win'],
                 'status' => 'in_progress',
                 'table_label' => $data['table_label'] ?? null,
-                'break_side' => $this->normalizeSide($data['break_side'] ?? null),
+                'break_side' => $breakSide,
+                'shooting_side' => $breakSide, // the breaker is up first
                 'started_at' => now(),
                 'previous_game_id' => $carry['previous_game_id'],
                 'champion_side' => $carry['champion_side'],
@@ -181,6 +184,11 @@ class GameController extends Controller
 
             $game->{'side_' . $side . '_ball_group'} = $group;
             $game->{'side_' . Game::otherSide($side) . '_ball_group'} = Game::otherBallGroup($group);
+
+            // Calling a real group means that side is the one shooting it.
+            if ($group !== null) {
+                $game->shooting_side = $side;
+            }
         }
 
         $game->save();
@@ -189,14 +197,30 @@ class GameController extends Controller
     }
 
     /**
-     * Bump a side's pocketed-ball count. Hitting the target ends the rack and
-     * sends the scoreboard to its "game over" state.
+     * Hand the table to a side. The app can't see a missed shot, so the
+     * operator taps the other player when the turn changes.
+     */
+    public function turn(Request $request, Game $game): RedirectResponse
+    {
+        $data = $request->validate(['side' => ['required', 'in:a,b']]);
+
+        if ($game->isLive()) {
+            $game->update(['shooting_side' => $data['side']]);
+        }
+
+        return back();
+    }
+
+    /**
+     * Bump a side's pocketed-ball count. The first pot on an open table detours
+     * through the "which group?" popup; hitting the target ends the rack.
      */
     public function score(Request $request, Game $game): RedirectResponse
     {
         $data = $request->validate([
             'side' => ['required', 'in:a,b'],
             'delta' => ['required', 'integer', 'between:-1,1'],
+            'group' => ['nullable', 'in:stripes,solids,open'],
         ]);
 
         if (! $game->isLive()) {
@@ -204,10 +228,28 @@ class GameController extends Controller
         }
 
         $side = $data['side'];
+        $delta = (int) $data['delta'];
+        $answeredGroup = $request->filled('group');
+
+        // First pot while the table is open: stop and ask which group went down.
+        if ($delta > 0 && $game->tableIsOpen() && ! $answeredGroup) {
+            return redirect()->route('games.show', [$game, 'call_group' => $side]);
+        }
+
+        // A group answered from the popup: set it, and its complement, now.
+        if ($answeredGroup && $data['group'] !== 'open') {
+            $game->{'side_' . $side . '_ball_group'} = $data['group'];
+            $game->{'side_' . Game::otherSide($side) . '_ball_group'} = Game::otherBallGroup($data['group']);
+        }
+
+        // Whoever just pocketed is at the table.
+        if ($delta > 0) {
+            $game->shooting_side = $side;
+        }
+
         $column = 'side_' . $side . '_score';
         $target = (int) $game->target_score;
-
-        $game->{$column} = max(0, min($target, (int) $game->{$column} + (int) $data['delta']));
+        $game->{$column} = max(0, min($target, (int) $game->{$column} + $delta));
         $game->save();
 
         if ($game->{$column} >= $target) {
@@ -216,7 +258,9 @@ class GameController extends Controller
             return redirect()->route('games.show', [$game, 'finished' => 1]);
         }
 
-        return back();
+        return $answeredGroup
+            ? redirect()->route('games.show', $game)
+            : back();
     }
 
     /**

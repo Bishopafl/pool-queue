@@ -25,7 +25,7 @@
         @foreach (['a', 'b'] as $side)
             @php $group = $game->ballGroup($side); @endphp
 
-            <div class="side {{ $game->winner_side === $side ? 'side--winner' : '' }}">
+            <div class="side {{ $game->winner_side === $side ? 'side--winner' : '' }} {{ $interactive && $game->isLive() && $game->isShooting($side) ? 'side--shooting' : '' }}">
                 <div class="side__group">
                     @if ($group)
                         @include('partials.ball', ['group' => $group, 'color' => '#f0c14b'])
@@ -42,6 +42,22 @@
                     @endif
                     {{ $game->sideLabel($side) }}
                 </p>
+
+                @if ($interactive && $game->isLive())
+                    <div class="side__turn-row">
+                        @if ($game->isShooting($side))
+                            <span class="side__turn side__turn--on">▸ At the table</span>
+                        @else
+                            <form method="POST" action="{{ route('games.turn', $game) }}">
+                                @csrf
+                                <input type="hidden" name="side" value="{{ $side }}">
+                                <button type="submit" class="side__turn side__turn--pass">
+                                    {{ $game->shooting_side === null ? 'Take the shot' : 'Hand over →' }}
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                @endif
 
                 <strong class="side__score">{{ $game->score($side) }}<span class="side__target">/{{ $game->target_score }}</span></strong>
 

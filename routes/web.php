@@ -19,6 +19,7 @@ Route::post('/games', [GameController::class, 'store'])->name('games.store');
 Route::get('/games/{game}', [GameController::class, 'show'])->name('games.show');
 Route::patch('/games/{game}', [GameController::class, 'update'])->name('games.update');
 Route::post('/games/{game}/score', [GameController::class, 'score'])->name('games.score');
+Route::post('/games/{game}/turn', [GameController::class, 'turn'])->name('games.turn');
 Route::post('/games/{game}/finish', [GameController::class, 'finish'])->name('games.finish');
 Route::delete('/games/{game}', [GameController::class, 'destroy'])->name('games.destroy');
 

@@ -53,85 +53,124 @@
         </div>
     @endif
 
+    @if (request()->filled('call_group') && $game->isLive() && $game->tableIsOpen())
+        @php $cg = request('call_group') === 'b' ? 'b' : 'a'; @endphp
+
+        <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cg-title">
+            <div class="modal">
+                <p class="modal__kicker">Table still open</p>
+                <h2 id="cg-title" class="modal__title">Which group did<br>{{ $game->sideLabel($cg) }} pocket?</h2>
+
+                <div class="modal__actions">
+                    @foreach (['solids' => 'Solids', 'stripes' => 'Stripes'] as $value => $caption)
+                        <form method="POST" action="{{ route('games.score', $game) }}">
+                            @csrf
+                            <input type="hidden" name="side" value="{{ $cg }}">
+                            <input type="hidden" name="delta" value="1">
+                            <input type="hidden" name="group" value="{{ $value }}">
+                            <button type="submit" class="btn btn--primary btn--lg btn--block">
+                                @include('partials.ball', ['group' => $value, 'color' => '#f0c14b', 'size' => 'sm'])
+                                {{ $caption }}
+                            </button>
+                        </form>
+                    @endforeach
+
+                    <form method="POST" action="{{ route('games.score', $game) }}">
+                        @csrf
+                        <input type="hidden" name="side" value="{{ $cg }}">
+                        <input type="hidden" name="delta" value="1">
+                        <input type="hidden" name="group" value="open">
+                        <button type="submit" class="btn btn--block">Neither — table still open</button>
+                    </form>
+
+                    <a class="btn btn--ghost btn--block" href="{{ route('games.show', $game) }}">Cancel</a>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @include('partials.game-card', ['game' => $game, 'interactive' => true])
 
     @if ($game->isLive())
 
-        <section class="card">
-            <div class="card__head">
-                <h2 class="card__title">Call the group</h2>
-            </div>
+        <div class="live-cards {{ $game->tableIsOpen() ? 'live-cards--two' : '' }}">
 
-            <form method="POST" action="{{ route('games.update', $game) }}">
-                @csrf
-                @method('PATCH')
-                <input type="hidden" name="ball_group_side" value="a">
-
-                <div class="field">
-                    <span class="label">{{ $game->sideLabel('a') }} is shooting</span>
-                    <div class="segment">
-                        <input type="radio" id="group-stripes" name="ball_group" value="stripes"
-                               @checked($game->side_a_ball_group === 'stripes')>
-                        <label for="group-stripes">
-                            @include('partials.ball', ['group' => 'stripes', 'color' => '#f0c14b', 'size' => 'sm'])
-                            Stripes
-                        </label>
-
-                        <input type="radio" id="group-solids" name="ball_group" value="solids"
-                               @checked($game->side_a_ball_group === 'solids')>
-                        <label for="group-solids">
-                            @include('partials.ball', ['group' => 'solids', 'color' => '#f0c14b', 'size' => 'sm'])
-                            Solids
-                        </label>
-
-                        <input type="radio" id="group-open" name="ball_group" value="open"
-                               @checked($game->side_a_ball_group === null)>
-                        <label for="group-open">
-                            @include('partials.ball', ['color' => 'var(--cue)', 'size' => 'sm'])
-                            Still open
-                        </label>
+            @if ($game->tableIsOpen())
+                <section class="card">
+                    <div class="card__head">
+                        <h2 class="card__title">Call the group</h2>
                     </div>
-                    <p class="hint">{{ $game->sideLabel('b') }} takes the other group automatically.</p>
+
+                    <form method="POST" action="{{ route('games.update', $game) }}">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="ball_group_side" value="a">
+
+                        <div class="field">
+                            <span class="label">{{ $game->sideLabel('a') }} is shooting</span>
+                            <div class="segment">
+                                <input type="radio" id="group-stripes" name="ball_group" value="stripes">
+                                <label for="group-stripes">
+                                    @include('partials.ball', ['group' => 'stripes', 'color' => '#f0c14b', 'size' => 'sm'])
+                                    Stripes
+                                </label>
+
+                                <input type="radio" id="group-solids" name="ball_group" value="solids">
+                                <label for="group-solids">
+                                    @include('partials.ball', ['group' => 'solids', 'color' => '#f0c14b', 'size' => 'sm'])
+                                    Solids
+                                </label>
+
+                                <input type="radio" id="group-open" name="ball_group" value="open" checked>
+                                <label for="group-open">
+                                    @include('partials.ball', ['color' => 'var(--cue)', 'size' => 'sm'])
+                                    Still open
+                                </label>
+                            </div>
+                            <p class="hint">{{ $game->sideLabel('b') }} takes the other group automatically. Or just tap + on the board — you'll be asked then.</p>
+                        </div>
+
+                        <button type="submit" class="btn btn--primary">Save group</button>
+                    </form>
+                </section>
+            @endif
+
+            <section class="card">
+                <div class="card__head">
+                    <h2 class="card__title">Call it early</h2>
                 </div>
 
-                <button type="submit" class="btn btn--primary">Save group</button>
-            </form>
-        </section>
+                <p class="hint" style="margin: 0 0 1.1rem">
+                    The rack ends on its own when a side reaches {{ $game->target_score }}. Use this only to
+                    settle it now — a scratch on the 8, or a conceded rack.
+                </p>
 
-        <section class="card">
-            <div class="card__head">
-                <h2 class="card__title">Call it early</h2>
-            </div>
+                <form method="POST" action="{{ route('games.finish', $game) }}">
+                    @csrf
 
-            <p class="hint" style="margin-top:0">
-                The rack ends on its own when a side reaches {{ $game->target_score }}. Use this only to
-                settle it now — a scratch on the 8, or a conceded rack.
-            </p>
-
-            <form method="POST" action="{{ route('games.finish', $game) }}">
-                @csrf
-
-                <div class="field">
-                    <span class="label">Winner</span>
-                    <div class="segment">
-                        <input type="radio" id="win-a" name="winner_side" value="a" required>
-                        <label for="win-a">{{ $game->sideLabel('a') }}</label>
-                        <input type="radio" id="win-b" name="winner_side" value="b" required>
-                        <label for="win-b">{{ $game->sideLabel('b') }}</label>
+                    <div class="field">
+                        <span class="label">Winner</span>
+                        <div class="segment">
+                            <input type="radio" id="win-a" name="winner_side" value="a" required>
+                            <label for="win-a">{{ $game->sideLabel('a') }}</label>
+                            <input type="radio" id="win-b" name="winner_side" value="b" required>
+                            <label for="win-b">{{ $game->sideLabel('b') }}</label>
+                        </div>
                     </div>
-                </div>
 
-                <div class="field">
-                    <div class="segment">
-                        <input type="hidden" name="requeue_loser" value="0">
-                        <input type="checkbox" id="requeue-loser" name="requeue_loser" value="1" checked>
-                        <label for="requeue-loser">Loser back in line</label>
+                    <div class="field">
+                        <div class="segment">
+                            <input type="hidden" name="requeue_loser" value="0">
+                            <input type="checkbox" id="requeue-loser" name="requeue_loser" value="1" checked>
+                            <label for="requeue-loser">Loser back in line</label>
+                        </div>
                     </div>
-                </div>
 
-                <button type="submit" class="btn btn--gold btn--lg">End the rack</button>
-            </form>
-        </section>
+                    <button type="submit" class="btn btn--gold btn--lg">End the rack</button>
+                </form>
+            </section>
+
+        </div>
 
         <section class="card">
             <div class="card__head">

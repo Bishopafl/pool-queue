@@ -36,6 +36,7 @@ class Game extends Model
         'status',
         'table_label',
         'break_side',
+        'shooting_side',
         'side_a_ball_group',
         'side_b_ball_group',
         'side_a_score',
@@ -80,6 +81,19 @@ class Game extends Model
     public function sideHasReachedTarget(string $side): bool
     {
         return $this->score($side) >= (int) $this->target_score;
+    }
+
+    /**
+     * No group called yet — the next pot decides stripes vs solids.
+     */
+    public function tableIsOpen(): bool
+    {
+        return $this->side_a_ball_group === null && $this->side_b_ball_group === null;
+    }
+
+    public function isShooting(string $side): bool
+    {
+        return $this->shooting_side === $side;
     }
 
     /**
