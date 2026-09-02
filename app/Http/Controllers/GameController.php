@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Game;
 use App\Models\Player;
+use App\Models\QueueEntry;
 use App\Services\QueueService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,12 +37,26 @@ class GameController extends Controller
 
     public function create(Request $request): View
     {
+        $gameType = $request->query('game_type');
+        $gameType = array_key_exists($gameType, Game::GAME_TYPES) ? $gameType : 'eight_ball';
+
+        $ballsToWin = (int) $request->query('balls_to_win');
+        if ($ballsToWin < 1 || $ballsToWin > 15) {
+            $ballsToWin = Game::defaultTargetFor($gameType);
+        }
+
+        $format = $request->query('format');
+
         return view('games.create', [
             'players' => Player::active()->orderBy('name')->get(),
             'preassigned' => [
                 'a' => $this->parseIdList($request->query('a')),
                 'b' => $this->parseIdList($request->query('b')),
             ],
+            'gameType' => $gameType,
+            'ballsToWin' => $ballsToWin,
+            'formatChoice' => in_array($format, ['1v1', '2v1', '2v2'], true) ? $format : '1v1',
+            'carryFrom' => $this->parseIdList($request->query('carry_from'))[0] ?? null,
         ]);
     }
 
@@ -49,6 +64,9 @@ class GameController extends Controller
     {
         $data = $request->validate([
             'format' => ['required', 'in:1v1,2v1,2v2'],
+            'game_type' => ['required', 'in:' . implode(',', array_keys(Game::GAME_TYPES))],
+            'balls_to_win' => ['required', 'integer', 'between:1,15'],
+            'carry_from' => ['nullable', 'integer', 'exists:games,id'],
             'table_label' => ['nullable', 'string', 'max:40'],
             'break_side' => ['nullable', 'in:a,b,none'],
             'assign' => ['required', 'array'],
@@ -69,13 +87,20 @@ class GameController extends Controller
         $this->assertLineupMatchesFormat($data['format'], $sideA, $sideB);
         $this->assertPlayersAreFree(array_merge($sideA, $sideB));
 
-        $game = DB::transaction(function () use ($data, $sideA, $sideB) {
+        $carry = $this->resolveCarry($data['carry_from'] ?? null, $sideA, $sideB);
+
+        $game = DB::transaction(function () use ($data, $sideA, $sideB, $carry) {
             $game = Game::create([
                 'format' => $data['format'],
+                'game_type' => $data['game_type'],
+                'target_score' => $data['balls_to_win'],
                 'status' => 'in_progress',
                 'table_label' => $data['table_label'] ?? null,
                 'break_side' => $this->normalizeSide($data['break_side'] ?? null),
                 'started_at' => now(),
+                'previous_game_id' => $carry['previous_game_id'],
+                'champion_side' => $carry['champion_side'],
+                'win_streak' => $carry['win_streak'],
             ]);
 
             $attach = [];
@@ -101,11 +126,27 @@ class GameController extends Controller
             ->with('status', 'Game started. Table is open until someone pockets a ball.');
     }
 
-    public function show(Game $game): View
+    public function show(Request $request, Game $game): View
     {
-        $game->load('players');
+        $game->load('players', 'previousGame');
 
-        return view('games.show', ['game' => $game]);
+        // Who the modal's "winner stays on" button lines up as the next challenger.
+        $nextChallengerIds = '';
+
+        if ($request->boolean('finished') && $game->isCompleted() && $game->winner_side) {
+            $winnerIds = $game->sidePlayers($game->winner_side)->pluck('id')->all();
+
+            $next = QueueEntry::ordered()->with('players')->get()
+                ->first(fn (QueueEntry $entry) => $entry->players->isNotEmpty()
+                    && $entry->players->pluck('id')->intersect($winnerIds)->isEmpty());
+
+            $nextChallengerIds = $next ? $next->players->pluck('id')->join(',') : '';
+        }
+
+        return view('games.show', [
+            'game' => $game,
+            'nextChallengerIds' => $nextChallengerIds,
+        ]);
     }
 
     /**
@@ -148,7 +189,8 @@ class GameController extends Controller
     }
 
     /**
-     * Bump a side's rack count up or down.
+     * Bump a side's pocketed-ball count. Hitting the target ends the rack and
+     * sends the scoreboard to its "game over" state.
      */
     public function score(Request $request, Game $game): RedirectResponse
     {
@@ -157,29 +199,44 @@ class GameController extends Controller
             'delta' => ['required', 'integer', 'between:-1,1'],
         ]);
 
-        $column = 'side_' . $data['side'] . '_score';
-        $game->{$column} = max(0, (int) $game->{$column} + (int) $data['delta']);
+        if (! $game->isLive()) {
+            return back();
+        }
+
+        $side = $data['side'];
+        $column = 'side_' . $side . '_score';
+        $target = (int) $game->target_score;
+
+        $game->{$column} = max(0, min($target, (int) $game->{$column} + (int) $data['delta']));
         $game->save();
+
+        if ($game->{$column} >= $target) {
+            $this->queue->finishGame(game: $game, winnerSide: $side, requeueLoser: true);
+
+            return redirect()->route('games.show', [$game, 'finished' => 1]);
+        }
 
         return back();
     }
 
+    /**
+     * Call the game manually (early 8-ball, scratch on the 8, conceded rack).
+     * Ends on the same "game over" screen as an auto-finish.
+     */
     public function finish(Request $request, Game $game): RedirectResponse
     {
         $data = $request->validate([
             'winner_side' => ['required', 'in:a,b'],
-            'winner_stays' => ['nullable', 'boolean'],
             'requeue_loser' => ['nullable', 'boolean'],
         ]);
 
         if ($game->isCompleted()) {
-            return back()->withErrors(['winner_side' => 'That game is already in the books.']);
+            return redirect()->route('games.show', [$game, 'finished' => 1]);
         }
 
         $winnerSide = $data['winner_side'];
-        $winnerStays = (bool) ($data['winner_stays'] ?? false);
 
-        // If nobody tracked racks, record the match itself as one rack.
+        // A called game with no ball count recorded still shows a 1-0 line.
         if ($game->side_a_score === 0 && $game->side_b_score === 0) {
             $game->forceFill(['side_' . $winnerSide . '_score' => 1])->save();
         }
@@ -188,20 +245,9 @@ class GameController extends Controller
             game: $game,
             winnerSide: $winnerSide,
             requeueLoser: (bool) ($data['requeue_loser'] ?? true),
-            requeueWinner: ! $winnerStays,
         );
 
-        if ($winnerStays) {
-            $game->load('players');
-
-            return redirect()
-                ->route('games.create', ['a' => $game->sidePlayers($winnerSide)->pluck('id')->join(',')])
-                ->with('status', 'Winner stays on. Pick their next challenger.');
-        }
-
-        return redirect()
-            ->route('queue.index')
-            ->with('status', 'Game recorded.');
+        return redirect()->route('games.show', [$game, 'finished' => 1]);
     }
 
     public function destroy(Game $game): RedirectResponse
@@ -268,6 +314,51 @@ class GameController extends Controller
     private function normalizeSide(?string $side): ?string
     {
         return in_array($side, ['a', 'b'], true) ? $side : null;
+    }
+
+    /**
+     * Work out whether this new game continues a winner-stays streak, and on
+     * which side the crown now sits.
+     *
+     * @param  array<int, int>  $sideA
+     * @param  array<int, int>  $sideB
+     * @return array{previous_game_id: int|null, champion_side: string|null, win_streak: int}
+     */
+    private function resolveCarry(?int $carryFrom, array $sideA, array $sideB): array
+    {
+        $none = ['previous_game_id' => null, 'champion_side' => null, 'win_streak' => 0];
+
+        if (! $carryFrom) {
+            return $none;
+        }
+
+        $previous = Game::with('players')->find($carryFrom);
+
+        if (! $previous || ! $previous->isCompleted() || ! $previous->winner_side) {
+            return $none;
+        }
+
+        $championIds = $previous->sidePlayers($previous->winner_side)->pluck('id')->all();
+
+        if ($championIds === []) {
+            return $none;
+        }
+
+        $championSide = match (true) {
+            array_diff($championIds, $sideA) === [] => 'a',
+            array_diff($championIds, $sideB) === [] => 'b',
+            default => null,
+        };
+
+        if ($championSide === null) {
+            return $none;
+        }
+
+        return [
+            'previous_game_id' => $previous->id,
+            'champion_side' => $championSide,
+            'win_streak' => $previous->championDefended() ? (int) $previous->win_streak + 1 : 1,
+        ];
     }
 
     /**

@@ -4,6 +4,55 @@
 
 @section('content')
 
+    @if (request()->boolean('finished') && $game->isCompleted() && $game->winner_side)
+        @php
+            $loserSide = $game->loserSide();
+            $winnerIds = $game->sidePlayers($game->winner_side)->pluck('id')->join(',');
+            $streakNow = $game->championDefended() ? $game->win_streak + 1 : 1;
+            $staysLabel = $nextChallengerIds ? '👑 Winner stays on — vs next up' : '👑 Winner stays on';
+        @endphp
+
+        <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="result-title">
+            <div class="modal">
+                <p class="modal__kicker">Game over</p>
+                <h2 id="result-title" class="modal__title">
+                    @if ($streakNow >= 1)<span class="modal__crown">👑</span>@endif
+                    {{ $game->sideLabel($game->winner_side) }} win
+                </h2>
+
+                <p class="modal__score">
+                    {{ $game->score($game->winner_side) }}<span>&ndash;</span>{{ $loserSide ? $game->score($loserSide) : 0 }}
+                </p>
+
+                <dl class="modal__details">
+                    <div><dt>Game</dt><dd>{{ $game->gameTypeLabel() }} · {{ $game->format }} · race to {{ $game->target_score }}</dd></div>
+                    <div><dt>Beat</dt><dd>{{ $loserSide ? $game->sideLabel($loserSide) : '—' }}</dd></div>
+                    @if ($game->hasCrown() && ! $game->championDefended())
+                        <div><dt>Crown</dt><dd>changes hands</dd></div>
+                    @elseif ($streakNow >= 2)
+                        <div><dt>Streak</dt><dd>{{ $streakNow }} in a row</dd></div>
+                    @endif
+                </dl>
+
+                <div class="modal__actions">
+                    <a class="btn btn--gold btn--lg btn--block"
+                       href="{{ route('games.create', array_filter([
+                           'a' => $winnerIds,
+                           'b' => $nextChallengerIds,
+                           'carry_from' => $game->id,
+                           'game_type' => $game->game_type,
+                           'balls_to_win' => $game->target_score,
+                           'format' => $game->format,
+                       ])) }}">
+                        {{ $staysLabel }}
+                    </a>
+                    <a class="btn btn--primary btn--lg btn--block" href="{{ route('games.create') }}">Brand-new game</a>
+                    <a class="btn btn--ghost btn--block" href="{{ route('queue.index') }}">Back to the table</a>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @include('partials.game-card', ['game' => $game, 'interactive' => true])
 
     @if ($game->isLive())
@@ -51,8 +100,13 @@
 
         <section class="card">
             <div class="card__head">
-                <h2 class="card__title">Record the result</h2>
+                <h2 class="card__title">Call it early</h2>
             </div>
+
+            <p class="hint" style="margin-top:0">
+                The rack ends on its own when a side reaches {{ $game->target_score }}. Use this only to
+                settle it now — a scratch on the 8, or a conceded rack.
+            </p>
 
             <form method="POST" action="{{ route('games.finish', $game) }}">
                 @csrf
@@ -68,20 +122,14 @@
                 </div>
 
                 <div class="field">
-                    <span class="label">Then what</span>
                     <div class="segment">
-                        <input type="hidden" name="winner_stays" value="0">
-                        <input type="checkbox" id="winner-stays" name="winner_stays" value="1" checked>
-                        <label for="winner-stays">Winner stays on</label>
-
                         <input type="hidden" name="requeue_loser" value="0">
                         <input type="checkbox" id="requeue-loser" name="requeue_loser" value="1" checked>
                         <label for="requeue-loser">Loser back in line</label>
                     </div>
-                    <p class="hint">If nobody tracked racks, the win counts as one.</p>
                 </div>
 
-                <button type="submit" class="btn btn--gold btn--lg">Record result</button>
+                <button type="submit" class="btn btn--gold btn--lg">End the rack</button>
             </form>
         </section>
 

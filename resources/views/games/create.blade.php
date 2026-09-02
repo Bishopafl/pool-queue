@@ -18,12 +18,36 @@
             <form method="POST" action="{{ route('games.store') }}" id="game-form">
                 @csrf
 
+                @if ($carryFrom)
+                    <input type="hidden" name="carry_from" value="{{ $carryFrom }}">
+                @endif
+
+                <div class="field">
+                    <span class="label">Game</span>
+                    <div class="segment">
+                        @foreach (\App\Models\Game::GAME_TYPES as $value => $meta)
+                            <input type="radio" id="type-{{ $value }}" name="game_type" value="{{ $value }}"
+                                   data-target="{{ $meta['target'] }}"
+                                   @checked(old('game_type', $gameType) === $value)>
+                            <label for="type-{{ $value }}">{{ $meta['label'] }}</label>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label" for="balls_to_win">Balls to win</label>
+                    <input class="input input--num" type="number" id="balls_to_win" name="balls_to_win"
+                           min="1" max="15" inputmode="numeric"
+                           value="{{ old('balls_to_win', $ballsToWin) }}">
+                    <p class="hint">First side to pocket this many balls takes the rack. Eight-ball fills in 8, nine-ball 9 — change it for a shorter race.</p>
+                </div>
+
                 <div class="field">
                     <span class="label">Format</span>
                     <div class="segment">
                         @foreach (['1v1' => 'Singles', '2v1' => 'Two on one', '2v2' => 'Doubles'] as $value => $caption)
                             <input type="radio" id="format-{{ $value }}" name="format" value="{{ $value }}"
-                                   @checked(old('format', '1v1') === $value)>
+                                   @checked(old('format', $formatChoice) === $value)>
                             <label for="format-{{ $value }}">{{ $value }} · {{ $caption }}</label>
                         @endforeach
                     </div>
@@ -95,7 +119,21 @@
                 (function () {
                     var form = document.getElementById('game-form');
                     var readout = document.getElementById('lineup-count');
-                    if (!form || !readout) return;
+                    if (!form) return;
+
+                    // Swap the balls-to-win default when the ruleset changes,
+                    // unless it has been hand-edited to something non-standard.
+                    var ballsInput = document.getElementById('balls_to_win');
+                    var standardTargets = ['8', '9'];
+                    form.querySelectorAll('input[name="game_type"]').forEach(function (radio) {
+                        radio.addEventListener('change', function () {
+                            if (ballsInput && standardTargets.indexOf(ballsInput.value) !== -1) {
+                                ballsInput.value = radio.getAttribute('data-target');
+                            }
+                        });
+                    });
+
+                    if (!readout) return;
 
                     function update() {
                         var a = form.querySelectorAll('input[value="a"][name^="assign"]:checked').length;

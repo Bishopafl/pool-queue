@@ -113,11 +113,13 @@ class QueueService
     }
 
     /**
-     * Close out a game and put the losing side back in line.
+     * Close out a game and, by default, put the losing side back in line. The
+     * winner's next move (stay on, or step off) is chosen from the game-over
+     * screen, so they are never requeued automatically here.
      */
-    public function finishGame(Game $game, string $winnerSide, bool $requeueLoser, bool $requeueWinner): void
+    public function finishGame(Game $game, string $winnerSide, bool $requeueLoser = true): void
     {
-        DB::transaction(function () use ($game, $winnerSide, $requeueLoser, $requeueWinner) {
+        DB::transaction(function () use ($game, $winnerSide, $requeueLoser) {
             $game->forceFill([
                 'winner_side' => $winnerSide,
                 'status' => 'completed',
@@ -128,10 +130,6 @@ class QueueService
 
             if ($requeueLoser) {
                 $this->enqueue($game->sidePlayers(Game::otherSide($winnerSide))->pluck('id')->all());
-            }
-
-            if ($requeueWinner) {
-                $this->enqueue($game->sidePlayers($winnerSide)->pluck('id')->all());
             }
         });
     }

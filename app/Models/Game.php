@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -20,8 +21,18 @@ class Game extends Model
         '2v2' => [2, 2],
     ];
 
+    /**
+     * Rulesets, with the default number of balls a side pockets to win the rack.
+     */
+    public const GAME_TYPES = [
+        'eight_ball' => ['label' => 'Eight-ball', 'target' => 8],
+        'nine_ball' => ['label' => 'Nine-ball', 'target' => 9],
+    ];
+
     protected $fillable = [
         'format',
+        'game_type',
+        'target_score',
         'status',
         'table_label',
         'break_side',
@@ -30,6 +41,9 @@ class Game extends Model
         'side_a_score',
         'side_b_score',
         'winner_side',
+        'win_streak',
+        'champion_side',
+        'previous_game_id',
         'notes',
         'started_at',
         'completed_at',
@@ -40,9 +54,53 @@ class Game extends Model
         return [
             'side_a_score' => 'integer',
             'side_b_score' => 'integer',
+            'target_score' => 'integer',
+            'win_streak' => 'integer',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Default balls-to-win for a ruleset.
+     */
+    public static function defaultTargetFor(string $gameType): int
+    {
+        return self::GAME_TYPES[$gameType]['target'] ?? 8;
+    }
+
+    public function gameTypeLabel(): string
+    {
+        return self::GAME_TYPES[$this->game_type]['label'] ?? ucfirst((string) $this->game_type);
+    }
+
+    /**
+     * Has this side pocketed enough balls to have won the rack?
+     */
+    public function sideHasReachedTarget(string $side): bool
+    {
+        return $this->score($side) >= (int) $this->target_score;
+    }
+
+    /**
+     * True while a winner-stays streak is running on this game.
+     */
+    public function hasCrown(): bool
+    {
+        return $this->champion_side !== null && (int) $this->win_streak >= 1;
+    }
+
+    /**
+     * Does the crowned side still hold it after this game's result?
+     */
+    public function championDefended(): bool
+    {
+        return $this->champion_side !== null && $this->champion_side === $this->winner_side;
+    }
+
+    public function previousGame(): BelongsTo
+    {
+        return $this->belongsTo(Game::class, 'previous_game_id');
     }
 
     public function participations(): HasMany

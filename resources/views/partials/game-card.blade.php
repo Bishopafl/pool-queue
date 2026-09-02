@@ -7,7 +7,9 @@
 
     <div class="table-card__top">
         <span class="tag {{ $game->isLive() ? 'tag--live' : '' }}">{{ $game->isLive() ? 'On the table' : $game->status }}</span>
+        <span>{{ $game->gameTypeLabel() }}</span>
         <span>{{ $game->format }}</span>
+        <span>race to {{ $game->target_score }}</span>
         @if ($game->table_label)
             <span>{{ $game->table_label }}</span>
         @endif
@@ -34,9 +36,14 @@
                     @endif
                 </div>
 
-                <p class="side__names">{{ $game->sideLabel($side) }}</p>
+                <p class="side__names">
+                    @if ($game->champion_side === $side && $game->win_streak >= 1)
+                        <span class="side__crown" title="{{ $game->win_streak }} straight win{{ $game->win_streak === 1 ? '' : 's' }}">👑</span>
+                    @endif
+                    {{ $game->sideLabel($side) }}
+                </p>
 
-                <strong class="side__score">{{ $game->score($side) }}</strong>
+                <strong class="side__score">{{ $game->score($side) }}<span class="side__target">/{{ $game->target_score }}</span></strong>
 
                 @if ($interactive && $game->isLive())
                     <div class="side__scorebar">
@@ -45,14 +52,16 @@
                             <input type="hidden" name="side" value="{{ $side }}">
                             <input type="hidden" name="delta" value="-1">
                             <button type="submit" class="btn btn--icon btn--ghost"
-                                    aria-label="Remove a rack from {{ $game->sideLabel($side) }}">&minus;</button>
+                                    aria-label="Take a ball back from {{ $game->sideLabel($side) }}"
+                                    @disabled($game->score($side) <= 0)>&minus;</button>
                         </form>
                         <form method="POST" action="{{ route('games.score', $game) }}">
                             @csrf
                             <input type="hidden" name="side" value="{{ $side }}">
                             <input type="hidden" name="delta" value="1">
                             <button type="submit" class="btn btn--icon"
-                                    aria-label="Add a rack for {{ $game->sideLabel($side) }}">+</button>
+                                    aria-label="Pocket a ball for {{ $game->sideLabel($side) }}"
+                                    @disabled($game->sideHasReachedTarget($side))>+</button>
                         </form>
                     </div>
                 @endif
