@@ -167,11 +167,36 @@ either run `php artisan migrate` on the server or update `schema.sql` to match.
 
 ---
 
+## Table camera (`/vision`)
+
+A phone in a case overlooking the table opens **https://yourdomain.com/vision** and does
+everything itself, in its browser: it finds the table, watches the balls, and posts each
+pot to the API below. The server only serves the page; nothing else runs on cPanel.
+
+1. **Pair** (once per phone): enter a camera name and the pairing password
+   (`VISION_PAIR_PASSWORD` in `.env`). The phone keeps its token.
+2. **Pick the table:** 7 ft, 8 ft or 9 ft. The size sets how big the balls look, and where
+   the pockets the camera can't see must be, from the ones it can.
+3. **Calibrate:** *Find the table* looks at 5 frames over a second (someone walking past
+   doesn't skew it). Green rings are pockets the camera saw, amber ones were placed from the
+   table's shape. Tap a pocket to move its ring, or *Tap 4 corners* if the outline is off.
+4. **Play:** the phone shows the table view, ball counts, frame rate and each pot with the
+   scoreboard's answer. Pots wait on the phone while Wi-Fi is down and go out when it's back.
+   The calibration is kept, so a reopened page goes straight back to watching.
+
+The page needs **https** (browsers only give the camera to secure pages) and a recent
+Chrome/Safari. The vision code (`public/vision-app/engine.js`, `worker.js`, `opencv.js`) is
+copied in from pool-vision by its `scripts/sync_web.sh`: edit it there, not here.
+
+**Frame rate matters.** The pot rules were tuned at 21-25 fps; a phone browser manages
+roughly 5-12 fps (shown on the play screen). The camera adapts its rules to the frame rate,
+but expect more missed pots than the laptop setup, and use the scoreboard's +/- buttons to
+fix any. Keep the phone plugged in: it runs flat out.
+
 ## pool-vision camera API
 
-[pool-vision](https://github.com/Bishopafl/pool-vision) runs on the laptop at the table
-(the camera can't be on the web server) and posts each pot here. Nothing extra runs on
-cPanel: it's two routes in this app, protected by a Laravel Sanctum token.
+The phone page above, or [pool-vision](https://github.com/Bishopafl/pool-vision) on a
+laptop, posts each pot here: two routes in this app, protected by a Laravel Sanctum token.
 
 | Route | Purpose |
 | --- | --- |
@@ -196,6 +221,9 @@ Every event, applied or not, is kept in `vision_events` with the outcome in word
 
 ### Issue the camera's token
 
+The phone page pairs itself with `VISION_PAIR_PASSWORD` (above). For the laptop app, or
+to issue one by hand:
+
 ```bash
 php artisan pool-vision:token table-1            # prints the token once
 php artisan pool-vision:token table-1 --revoke   # if the laptop is lost or the token leaks
@@ -213,12 +241,22 @@ $env:POOL_QUEUE_URL   = "https://yourdomain.com"
 $env:POOL_QUEUE_TOKEN = "<the token>"
 ```
 
-### Deploying this change
+### Updating a live site to this version (File Manager, no SSH)
 
-It adds two tables. Run `php artisan migrate --force` (SSH, Terminal or the cron trick).
-With no shell at all, import just the `pool-vision camera API` section of
-`database/schema.sql` in phpMyAdmin, plus its two `migrations` rows. Composer now also
-installs `laravel/sanctum`, so with Option B rebuild the zip with `vendor/`.
+1. **Back up** first: phpMyAdmin → *Export* the database, and File Manager → compress
+   `~/pool-queue` (minus `vendor/`) into a zip you keep.
+2. **Upload** `pool-queue-update.zip` (built with `composer install --no-dev`, includes
+   `vendor/` and the new `bootstrap/cache/packages.php` that registers Sanctum) to your home
+   folder, and **Extract** it over `~/pool-queue`, overwriting. It contains no `.env` and no
+   `storage/`, so your settings, logs and sessions are untouched.
+3. **Database:** phpMyAdmin → select the database → *Import* →
+   `database/updates/2026-10-07-vision-camera.sql`. Safe to run twice. (With a shell, use
+   `php artisan migrate --force` instead.)
+4. **`.env`:** add a line `VISION_PAIR_PASSWORD=` with a password of your choice.
+5. **Clear cached config**, if there is any: delete `bootstrap/cache/config.php` and
+   `bootstrap/cache/routes-v7.php` in File Manager. A cached config hides the new `.env`
+   line and a cached route list hides `/vision`.
+6. Open **https://yourdomain.com/vision** on the phone and pair it.
 
 ---
 
@@ -242,6 +280,9 @@ SESSION_DRIVER=database
 CACHE_STORE=database
 QUEUE_CONNECTION=sync
 LOG_LEVEL=error
+
+# the phone camera at /vision pairs with this (blank turns pairing off)
+VISION_PAIR_PASSWORD=pick-a-long-one
 ```
 
 `APP_DEBUG` must be `false` and `APP_ENV` `production` in production. Never commit
@@ -255,6 +296,10 @@ LOG_LEVEL=error
 | --- | --- |
 | 500, blank page | `tail storage/logs/laravel.log`; check `storage/` + `bootstrap/cache/` are 775 |
 | "No application encryption key" | `php artisan key:generate` (or set `APP_KEY` by hand) |
+| `/vision` 404 | Delete `bootstrap/cache/routes-v7.php`; make sure the zip's `routes/web.php` was extracted |
+| "Pairing is off on the server" | `VISION_PAIR_PASSWORD` missing from `.env`, or a cached `bootstrap/cache/config.php` (delete it) |
+| API calls fail with 500 "auth guard [sanctum]" | `bootstrap/cache/packages.php` is old: re-extract it from the update zip |
+| Phone says it needs https | Open the `https://` address; enable AutoSSL in cPanel if the certificate is missing |
 | `Table 'x.sessions' doesn't exist` / 500 on first load | Structure not loaded — run `php artisan migrate --force` or import the full `schema.sql` (see [The database](#the-database)) |
 | Old code still served after `git pull` | `php artisan config:clear && ./deploy.sh` |
 | CSS missing / links 404 | Document root is not pointing at `public/` |

@@ -4,6 +4,7 @@ use App\Http\Controllers\GameController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\QueueController;
+use App\Http\Controllers\VisionAppController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [QueueController::class, 'index'])->name('queue.index');
@@ -29,3 +30,7 @@ Route::patch('/players/{player}', [PlayerController::class, 'update'])->name('pl
 Route::delete('/players/{player}', [PlayerController::class, 'destroy'])->name('players.destroy');
 
 Route::get('/leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard.index');
+
+// The in-browser camera: a phone overlooking the table watches the balls and posts pots.
+Route::get('/vision', [VisionAppController::class, 'show'])->name('vision.show');
+Route::post('/vision/pair', [VisionAppController::class, 'pair'])->middleware('throttle:5,1')->name('vision.pair');
