@@ -220,6 +220,49 @@ CREATE TABLE `queue_entry_players` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
+--  pool-vision camera API (Laravel Sanctum tokens + the camera's event log)
+-- =============================================================================
+
+CREATE TABLE `personal_access_tokens` (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `tokenable_type` varchar(255) NOT NULL,
+  `tokenable_id` bigint UNSIGNED NOT NULL,
+  `name` text NOT NULL,
+  `token` varchar(64) NOT NULL,
+  `abilities` text,
+  `last_used_at` timestamp NULL DEFAULT NULL,
+  `expires_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `personal_access_tokens_token_unique` (`token`),
+  KEY `personal_access_tokens_tokenable_type_tokenable_id_index` (`tokenable_type`,`tokenable_id`),
+  KEY `personal_access_tokens_expires_at_index` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--  Every pot the camera sends, applied or not. event_id is chosen by the camera,
+--  so a retried request is recognised and never scored twice.
+CREATE TABLE `vision_events` (
+  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  `event_id` char(36) NOT NULL,
+  `game_id` bigint UNSIGNED DEFAULT NULL,
+  `table_label` varchar(40) DEFAULT NULL,
+  `type` varchar(20) NOT NULL,
+  `kind` varchar(20) NOT NULL,
+  `pocket` varchar(40) DEFAULT NULL,
+  `kind_conf` decimal(4,2) DEFAULT NULL,
+  `video_t` decimal(10,2) DEFAULT NULL,
+  `applied` tinyint(1) NOT NULL DEFAULT '0',
+  `outcome` varchar(255) NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `vision_events_event_id_unique` (`event_id`),
+  KEY `vision_events_game_id_created_at_index` (`game_id`,`created_at`),
+  CONSTRAINT `vision_events_game_id_foreign` FOREIGN KEY (`game_id`) REFERENCES `games` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================================================
 --  Mark every migration as already run
 -- =============================================================================
 
@@ -234,6 +277,8 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
   ('2026_08_29_000005_create_queue_entry_players_table', 1),
   ('2026_09_02_000001_add_game_type_and_streak_to_games_table', 1),
   ('2026_09_02_000002_add_side_colors_to_players_table', 1),
-  ('2026_09_02_000003_add_shooting_side_to_games_table', 1);
+  ('2026_09_02_000003_add_shooting_side_to_games_table', 1),
+  ('2026_10_07_000000_create_vision_events_table', 1),
+  ('2026_10_07_133710_create_personal_access_tokens_table', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

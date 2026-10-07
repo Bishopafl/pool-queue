@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Game;
 use App\Models\Player;
 use App\Models\QueueEntry;
+use App\Services\GameScoringService;
 use App\Services\QueueService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,9 +15,10 @@ use Illuminate\View\View;
 
 class GameController extends Controller
 {
-    public function __construct(private readonly QueueService $queue)
-    {
-    }
+    public function __construct(
+        private readonly QueueService $queue,
+        private readonly GameScoringService $scoring,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -64,7 +66,7 @@ class GameController extends Controller
     {
         $data = $request->validate([
             'format' => ['required', 'in:1v1,2v1,2v2'],
-            'game_type' => ['required', 'in:' . implode(',', array_keys(Game::GAME_TYPES))],
+            'game_type' => ['required', 'in:'.implode(',', array_keys(Game::GAME_TYPES))],
             'balls_to_win' => ['required', 'integer', 'between:1,15'],
             'carry_from' => ['nullable', 'integer', 'exists:games,id'],
             'table_label' => ['nullable', 'string', 'max:40'],
@@ -182,8 +184,8 @@ class GameController extends Controller
             $side = $data['ball_group_side'];
             $group = $data['ball_group'] === 'open' ? null : $data['ball_group'];
 
-            $game->{'side_' . $side . '_ball_group'} = $group;
-            $game->{'side_' . Game::otherSide($side) . '_ball_group'} = Game::otherBallGroup($group);
+            $game->{'side_'.$side.'_ball_group'} = $group;
+            $game->{'side_'.Game::otherSide($side).'_ball_group'} = Game::otherBallGroup($group);
 
             // Calling a real group means that side is the one shooting it.
             if ($group !== null) {
@@ -204,9 +206,7 @@ class GameController extends Controller
     {
         $data = $request->validate(['side' => ['required', 'in:a,b']]);
 
-        if ($game->isLive()) {
-            $game->update(['shooting_side' => $data['side']]);
-        }
+        $this->scoring->passTurn($game, $data['side']);
 
         return back();
     }
@@ -236,25 +236,10 @@ class GameController extends Controller
             return redirect()->route('games.show', [$game, 'call_group' => $side]);
         }
 
-        // A group answered from the popup: set it, and its complement, now.
-        if ($answeredGroup && $data['group'] !== 'open') {
-            $game->{'side_' . $side . '_ball_group'} = $data['group'];
-            $game->{'side_' . Game::otherSide($side) . '_ball_group'} = Game::otherBallGroup($data['group']);
-        }
+        // A group answered from the popup is set (with its complement) as the pot is counted.
+        $finished = $this->scoring->addPot($game, $side, $delta, $answeredGroup ? $data['group'] : null);
 
-        // Whoever just pocketed is at the table.
-        if ($delta > 0) {
-            $game->shooting_side = $side;
-        }
-
-        $column = 'side_' . $side . '_score';
-        $target = (int) $game->target_score;
-        $game->{$column} = max(0, min($target, (int) $game->{$column} + $delta));
-        $game->save();
-
-        if ($game->{$column} >= $target) {
-            $this->queue->finishGame(game: $game, winnerSide: $side, requeueLoser: true);
-
+        if ($finished) {
             return redirect()->route('games.show', [$game, 'finished' => 1]);
         }
 
@@ -282,7 +267,7 @@ class GameController extends Controller
 
         // A called game with no ball count recorded still shows a 1-0 line.
         if ($game->side_a_score === 0 && $game->side_b_score === 0) {
-            $game->forceFill(['side_' . $winnerSide . '_score' => 1])->save();
+            $game->forceFill(['side_'.$winnerSide.'_score' => 1])->save();
         }
 
         $this->queue->finishGame(
@@ -350,7 +335,7 @@ class GameController extends Controller
 
         if ($busy->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'assign' => $busy->join(', ') . ' ' . ($busy->count() === 1 ? 'is' : 'are') . ' already in a live game.',
+                'assign' => $busy->join(', ').' '.($busy->count() === 1 ? 'is' : 'are').' already in a live game.',
             ]);
         }
     }
