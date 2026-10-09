@@ -1,4 +1,4 @@
--- Pool Queue update: the table camera (/vision) and its API.
+-- Pool Queue update: the camera API that Pool Vision (and the laptop camera) post pots to.
 --
 -- For a database that is already live (no shell): phpMyAdmin → select the database →
 -- Import → this file. Safe to run twice. It adds two tables and records their

@@ -28,7 +28,7 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    // The in-browser camera at /vision: phones pair with this password (blank = pairing off).
+    // Pool Vision cameras (poolvision.adamlopez.co) pair with this password (blank = pairing off).
     'vision' => [
         'pair_password' => env('VISION_PAIR_PASSWORD'),
     ],

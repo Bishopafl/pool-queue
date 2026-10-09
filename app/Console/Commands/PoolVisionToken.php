@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 
 /**
  * Issue (or revoke) the Sanctum token a pool-vision camera posts pots with.
- * The /vision page can also pair a phone itself (VISION_PAIR_PASSWORD).
+ * Pool Vision phones can also pair themselves (POST /api/vision/pair, VISION_PAIR_PASSWORD).
  */
 class PoolVisionToken extends Command
 {

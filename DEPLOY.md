@@ -4,6 +4,8 @@ This app is a plain Laravel 13 site with **no login for the web UI** and **no fr
 (the CSS is committed to `public/css/app.css` and loaded via `asset()`), so you can
 ignore anything about `npm` / `vite` when deploying. The only authenticated part is the
 [pool-vision camera API](#pool-vision-camera-api), which uses Laravel Sanctum tokens.
+The phone camera itself is a separate project and site, Pool Vision
+(https://poolvision.adamlopez.co, in the pool-vision repo); this app only takes its pots.
 
 Two wrinkles apply to any Laravel app on cPanel:
 
@@ -167,43 +169,33 @@ either run `php artisan migrate` on the server or update `schema.sql` to match.
 
 ---
 
-## Table camera (`/vision`)
+## Pool Vision cameras (another site)
 
-A phone in a case overlooking the table opens **https://yourdomain.com/vision** and does
-everything itself, in its browser: it finds the table, watches the balls, and posts each
-pot to the API below. The server only serves the page; nothing else runs on cPanel.
+Pool Vision (https://poolvision.adamlopez.co, beta) is a separate project: a phone
+overlooking the table tracks the game in its own browser and keeps score by itself. It is
+built and deployed from the [pool-vision](https://github.com/Bishopafl/pool-vision) repo, not
+from here. This app's only part is the optional link: when someone links Pool Vision to this
+scoreboard, it pairs with `POST /api/vision/pair` and sends its pots to the API below.
 
-1. **Pair** (once per phone): enter a camera name and the pairing password
-   (`VISION_PAIR_PASSWORD` in `.env`). The phone keeps its token.
-2. **Pick the table:** 7 ft, 8 ft or 9 ft. The size sets how big the balls look, and where
-   the pockets the camera can't see must be, from the ones it can.
-3. **Calibrate:** *Find the table* looks at 5 frames over a second (someone walking past
-   doesn't skew it). Green rings are pockets the camera saw, amber ones were placed from the
-   table's shape. Tap a pocket to move its ring, or *Tap 4 corners* if the outline is off.
-4. **Play:** the phone shows the table view, ball counts, frame rate and each pot with the
-   scoreboard's answer. Pots wait on the phone while Wi-Fi is down and go out when it's back.
-   The calibration is kept, so a reopened page goes straight back to watching.
+Two `.env` settings control that:
 
-The page needs **https** (browsers only give the camera to secure pages) and a recent
-Chrome/Safari. The vision code (`public/vision-app/engine.js`, `worker.js`, `opencv.js`) is
-copied in from pool-vision by its `scripts/sync_web.sh`: edit it there, not here.
-
-**Frame rate matters.** The pot rules were tuned at 21-25 fps; a phone browser manages
-roughly 5-12 fps (shown on the play screen). The camera adapts its rules to the frame rate,
-but expect more missed pots than the laptop setup, and use the scoreboard's +/- buttons to
-fix any. Keep the phone plugged in: it runs flat out.
+- `VISION_PAIR_PASSWORD`: the password the phone enters to link. Blank turns pairing off.
+- `VISION_ALLOWED_ORIGINS`: the sites whose pages may call `/api/vision/*` from a browser
+  (CORS, `config/cors.php`), comma-separated. Defaults to `https://poolvision.adamlopez.co`.
+  The laptop app isn't a browser, so it doesn't need to be listed.
 
 ## pool-vision camera API
 
-The phone page above, or [pool-vision](https://github.com/Bishopafl/pool-vision) on a
-laptop, posts each pot here: two routes in this app, protected by a Laravel Sanctum token.
+Pool Vision on a phone, or [pool-vision](https://github.com/Bishopafl/pool-vision) on a
+laptop, posts each pot here, protected by a Laravel Sanctum token.
 
 | Route | Purpose |
 | --- | --- |
+| `POST /api/vision/pair` | `{"name": "table-1", "password": "..."}` → `{"token": "..."}` when the password matches `VISION_PAIR_PASSWORD` (403 if wrong, 503 if pairing is off; 5 tries a minute) |
 | `GET /api/vision/game?table=Front` | The live game: sides, players, groups, scores, who is shooting |
 | `POST /api/vision/events` | One pot: `{"event_id": "<uuid>", "type": "pot", "kind": "solid", "pocket": "top side", "kind_conf": 0.9, "t": 812.4, "table": "Front"}` |
 
-Both need `Authorization: Bearer <token>` from a token with the `vision` ability, and are
+The other two need `Authorization: Bearer <token>` from a token with the `vision` ability, and are
 limited to 120 requests a minute. A repeated `event_id` returns the first result and is
 never scored twice, so the camera can retry safely.
 
@@ -221,7 +213,7 @@ Every event, applied or not, is kept in `vision_events` with the outcome in word
 
 ### Issue the camera's token
 
-The phone page pairs itself with `VISION_PAIR_PASSWORD` (above). For the laptop app, or
+Pool Vision pairs itself with `VISION_PAIR_PASSWORD` (above). For the laptop app, or
 to issue one by hand:
 
 ```bash
@@ -252,11 +244,13 @@ $env:POOL_QUEUE_TOKEN = "<the token>"
 3. **Database:** phpMyAdmin → select the database → *Import* →
    `database/updates/2026-10-07-vision-camera.sql`. Safe to run twice. (With a shell, use
    `php artisan migrate --force` instead.)
-4. **`.env`:** add a line `VISION_PAIR_PASSWORD=` with a password of your choice.
+4. **`.env`:** add `VISION_PAIR_PASSWORD=` with a password of your choice, and
+   `VISION_ALLOWED_ORIGINS=https://poolvision.adamlopez.co`.
 5. **Clear cached config**, if there is any: delete `bootstrap/cache/config.php` and
    `bootstrap/cache/routes-v7.php` in File Manager. A cached config hides the new `.env`
-   line and a cached route list hides `/vision`.
-6. Open **https://yourdomain.com/vision** on the phone and pair it.
+   lines and a cached route list hides the new API routes.
+6. Check it: https://yourdomain.com/api/vision/game should answer `{"message":"Unauthenticated."}`.
+   Then link from Pool Vision (its "Scoreboard" button).
 
 ---
 
@@ -281,8 +275,10 @@ CACHE_STORE=database
 QUEUE_CONNECTION=sync
 LOG_LEVEL=error
 
-# the phone camera at /vision pairs with this (blank turns pairing off)
+# Pool Vision phones link with this password (blank turns pairing off); browser calls to the
+# camera API are only allowed from these sites
 VISION_PAIR_PASSWORD=pick-a-long-one
+VISION_ALLOWED_ORIGINS=https://poolvision.adamlopez.co
 ```
 
 `APP_DEBUG` must be `false` and `APP_ENV` `production` in production. Never commit
@@ -296,10 +292,10 @@ VISION_PAIR_PASSWORD=pick-a-long-one
 | --- | --- |
 | 500, blank page | `tail storage/logs/laravel.log`; check `storage/` + `bootstrap/cache/` are 775 |
 | "No application encryption key" | `php artisan key:generate` (or set `APP_KEY` by hand) |
-| `/vision` 404 | Delete `bootstrap/cache/routes-v7.php`; make sure the zip's `routes/web.php` was extracted |
-| "Pairing is off on the server" | `VISION_PAIR_PASSWORD` missing from `.env`, or a cached `bootstrap/cache/config.php` (delete it) |
+| `/api/vision/...` 404 | Delete `bootstrap/cache/routes-v7.php`; make sure the zip's `routes/api.php` was extracted |
+| "Pairing is off" when linking Pool Vision | `VISION_PAIR_PASSWORD` missing from `.env`, or a cached `bootstrap/cache/config.php` (delete it) |
+| Pool Vision says "Couldn't reach" the scoreboard | Its address is wrong, or this site isn't updated, or `VISION_ALLOWED_ORIGINS` doesn't list the Pool Vision address exactly (`https://`, no trailing slash) |
 | API calls fail with 500 "auth guard [sanctum]" | `bootstrap/cache/packages.php` is old: re-extract it from the update zip |
-| Phone says it needs https | Open the `https://` address; enable AutoSSL in cPanel if the certificate is missing |
 | `Table 'x.sessions' doesn't exist` / 500 on first load | Structure not loaded — run `php artisan migrate --force` or import the full `schema.sql` (see [The database](#the-database)) |
 | Old code still served after `git pull` | `php artisan config:clear && ./deploy.sh` |
 | CSS missing / links 404 | Document root is not pointing at `public/` |
