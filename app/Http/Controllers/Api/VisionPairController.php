@@ -8,7 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * POST /api/vision/pair: a Pool Vision phone (poolvision.adamlopez.co) trades the
+ * POST /api/vision/pair: a Pool Vision phone (pv.adamlopez.co) trades the
  * pairing password (VISION_PAIR_PASSWORD in .env) for its camera token, so no shell
  * is needed to set up a camera.
  */

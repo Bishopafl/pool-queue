@@ -8,14 +8,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Pairing a Pool Vision phone (poolvision.adamlopez.co) with the camera API, and the
+ * Pairing a Pool Vision phone (pv.adamlopez.co) with the camera API, and the
  * cross-origin rules that let that site call it.
  */
 class VisionPairTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const ORIGIN = 'https://poolvision.adamlopez.co';
+    private const ORIGIN = 'https://pv.adamlopez.co';
 
     public function test_the_camera_page_is_not_served_here_any_more(): void
     {

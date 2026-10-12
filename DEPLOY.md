@@ -5,7 +5,7 @@ This app is a plain Laravel 13 site with **no login for the web UI** and **no fr
 ignore anything about `npm` / `vite` when deploying. The only authenticated part is the
 [pool-vision camera API](#pool-vision-camera-api), which uses Laravel Sanctum tokens.
 The phone camera itself is a separate project and site, Pool Vision
-(https://poolvision.adamlopez.co, in the pool-vision repo); this app only takes its pots.
+(https://pv.adamlopez.co, in the pool-vision repo); this app only takes its pots.
 
 Two wrinkles apply to any Laravel app on cPanel:
 
@@ -171,7 +171,7 @@ either run `php artisan migrate` on the server or update `schema.sql` to match.
 
 ## Pool Vision cameras (another site)
 
-Pool Vision (https://poolvision.adamlopez.co, beta) is a separate project: a phone
+Pool Vision (https://pv.adamlopez.co, beta) is a separate project: a phone
 overlooking the table tracks the game in its own browser and keeps score by itself. It is
 built and deployed from the [pool-vision](https://github.com/Bishopafl/pool-vision) repo, not
 from here. This app's only part is the optional link: when someone links Pool Vision to this
@@ -181,7 +181,7 @@ Two `.env` settings control that:
 
 - `VISION_PAIR_PASSWORD`: the password the phone enters to link. Blank turns pairing off.
 - `VISION_ALLOWED_ORIGINS`: the sites whose pages may call `/api/vision/*` from a browser
-  (CORS, `config/cors.php`), comma-separated. Defaults to `https://poolvision.adamlopez.co`.
+  (CORS, `config/cors.php`), comma-separated. Defaults to `https://pv.adamlopez.co`.
   The laptop app isn't a browser, so it doesn't need to be listed.
 
 ## pool-vision camera API
@@ -245,7 +245,7 @@ $env:POOL_QUEUE_TOKEN = "<the token>"
    `database/updates/2026-10-07-vision-camera.sql`. Safe to run twice. (With a shell, use
    `php artisan migrate --force` instead.)
 4. **`.env`:** add `VISION_PAIR_PASSWORD=` with a password of your choice, and
-   `VISION_ALLOWED_ORIGINS=https://poolvision.adamlopez.co`.
+   `VISION_ALLOWED_ORIGINS=https://pv.adamlopez.co`.
 5. **Clear cached config**, if there is any: delete `bootstrap/cache/config.php` and
    `bootstrap/cache/routes-v7.php` in File Manager. A cached config hides the new `.env`
    lines and a cached route list hides the new API routes.
@@ -278,7 +278,7 @@ LOG_LEVEL=error
 # Pool Vision phones link with this password (blank turns pairing off); browser calls to the
 # camera API are only allowed from these sites
 VISION_PAIR_PASSWORD=pick-a-long-one
-VISION_ALLOWED_ORIGINS=https://poolvision.adamlopez.co
+VISION_ALLOWED_ORIGINS=https://pv.adamlopez.co
 ```
 
 `APP_DEBUG` must be `false` and `APP_ENV` `production` in production. Never commit
